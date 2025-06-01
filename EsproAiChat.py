@@ -8,9 +8,10 @@ from lexica.constants import languageModels
 from typing import Union, Tuple
 
 # ========== BOT TOKEN ==========
-API_ID = 12345678               # 🔁 Replace with your API ID
-API_HASH = "your_api_hash"      # 🔁 Replace with your API Hash
-BOT_TOKEN = "your_bot_token"    # 🔁 Replace with your Bot Token
+API_ID = os.environ.get("API_ID", "none") 
+API_HASH = os.environ.get("API_HASH", "none") 
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "none") 
+
 
 # Ensure downloads folder exists
 os.makedirs("./downloads", exist_ok=True)

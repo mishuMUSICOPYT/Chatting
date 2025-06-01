@@ -2,6 +2,7 @@ import asyncio
 import base64
 import mimetypes
 import os
+import re
 import pathlib
 from typing import Union, Tuple
 
@@ -10,10 +11,9 @@ from lexica import AsyncClient
 from lexica.constants import languageModels
 
 # === CONFIGURATION ===
-API_ID = 12380656           # Replace with your Telegram API ID
-API_HASH = "d927c13beaaf5110f25c505b7c071273" # Replace with your Telegram API Hash
-BOT_TOKEN = "7840426677:AAGFeHBzlWnKMXeUKM9QhlcMAeZAlSiaCJs"  # Replace with your Telegram Bot Token
-
+API_ID = os.environ.get("API_ID", "none") 
+API_HASH = os.environ.get("API_HASH", "none") 
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "none") 
 # Create downloads directory if not exists
 DOWNLOAD_DIR = pathlib.Path("./downloads")
 DOWNLOAD_DIR.mkdir(exist_ok=True)

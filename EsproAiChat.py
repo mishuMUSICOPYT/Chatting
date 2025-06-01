@@ -12,7 +12,6 @@ API_ID = os.environ.get("API_ID", "none")
 API_HASH = os.environ.get("API_HASH", "none") 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "none") 
 
-
 # Ensure downloads folder exists
 os.makedirs("./downloads", exist_ok=True)
 
@@ -20,7 +19,6 @@ os.makedirs("./downloads", exist_ok=True)
 app = Client("AIChatBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 # ========== AI Chat Completion ==========
-# Use typing.Union for compatibility with Python versions < 3.10
 async def ChatCompletion(prompt: str, model: str) -> Union[Tuple[str, list], str]:
     try:
         modelInfo = getattr(languageModels, model)
@@ -79,7 +77,7 @@ def getText(message: t.Message):
         return message.text
 
 # ========== Auto AI Chat Handler ==========
-@app.on_message(filters.text & ~filters.command)
+@app.on_message(filters.text & ~filters.command())
 async def auto_chat(_, m: t.Message):
     if m.from_user.is_bot:
         return
@@ -120,5 +118,5 @@ async def askAboutImage(_, m: t.Message, mediaFiles: list, prompt: str):
 
 # ========== Run the Bot ==========
 if __name__ == "__main__":
-    print("Starting AI Chat Bot...")
+    print("✅ AI Chat Bot is running...")
     app.run()

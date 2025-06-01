@@ -81,8 +81,11 @@ def getText(message):
     else:
         return None
 
-@app.on_message(filters.command(["gpt", "bard", "llama", "mistral", "palm", "gemini"]))
-async def chatbots(_, m: t.Message):
+# ========== Auto AI Chat Handler ==========
+@app.on_message(filters.text & ~filters.command)
+async def auto_chat(_, m: t.Message):
+    if m.from_user.is_bot:
+        return
     prompt = getText(m)
     media = getMedia(m)
     if media is not None:

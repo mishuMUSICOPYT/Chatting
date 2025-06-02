@@ -85,17 +85,17 @@ def getText(message):
 async def start_command(_, m: t.Message):
     keyboard = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("ðŸ‘¤ Owner", url="https://t.me/{OWNER_USERNAME}")],
-            [InlineKeyboardButton("âž• Add Me To Group", url="https://t.me/{BOT_USERNAME}?startgroup=true&admin=delete_messages+manage_video_chats+pin_messages")]
+            [InlineKeyboardButton("👤 Owner", url="https://t.me/{OWNER_USERNAME}")],
+            [InlineKeyboardButton("➕ Add Me To Group", url="https://t.me/{BOT_USERNAME}?startgroup=true&admin=delete_messages+manage_video_chats+pin_messages")]
         ]
     )
     await m.reply_photo(
         photo=START_PHOTO,
         caption=(
-            f"ðŸ‘‹ Hello {m.from_user.mention}!\n\n"
+            f"👋 Hello {m.from_user.mention}!\n\n"
             "Welcome to the AI chatbot.\n"
             "Use commands like /gpt, /bard, /gemini to chat with advanced AI models.\n\n"
-            "â„¹ï¸ For help or updates, contact the owner or add me to a group using the button below."
+            "✴️ For help or updates, contact the owner or add me to a group using the button below."
         ),
         reply_markup=keyboard
     )

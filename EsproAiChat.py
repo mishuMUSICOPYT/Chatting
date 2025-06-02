@@ -21,6 +21,8 @@ API_ID = int(get_env_var("API_ID"))
 API_HASH = get_env_var("API_HASH")
 BOT_TOKEN = get_env_var("BOT_TOKEN")
 START_PHOTO = get_env_var("START_PHOTO")
+BOT_USERNAME = get_env_var("BOT_USERNAME")
+OWNER_USERNAME = get_env_var("OWNER_USERNAME")
 
 app = Client("AIChatBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -83,8 +85,8 @@ def getText(message):
 async def start_command(_, m: t.Message):
     keyboard = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("ðŸ‘¤ Owner", url="https://t.me/ll_ksd_ll")],
-            [InlineKeyboardButton("âž• Add Me To Group", url="https://t.me/PowerStudyChatgptBot?startgroup=true&admin=delete_messages+manage_video_chats+pin_messages")]
+            [InlineKeyboardButton("ðŸ‘¤ Owner", url="https://t.me/{OWNER_USERNAME}")],
+            [InlineKeyboardButton("âž• Add Me To Group", url="https://t.me/{BOT_USERNAME}?startgroup=true&admin=delete_messages+manage_video_chats+pin_messages")]
         ]
     )
     await m.reply_photo(

@@ -34,6 +34,9 @@ logger = logging.getLogger(__name__)
 # ========== IN-MEMORY MODEL SELECTION ==========
 user_model_memory = {}
 
+# ========== ENSURE DOWNLOAD FOLDER ==========
+os.makedirs('./downloads', exist_ok=True)
+
 # ========== CHAT COMPLETION ==========
 async def ChatCompletion(prompt, model) -> Union[Tuple[str, list], str]:
     try:
@@ -82,13 +85,11 @@ def getMedia(message):
 
 # ========== TEXT EXTRACTOR ==========
 def getText(message):
-    if not message.text:
-        return None
-    try:
+    if message.text and ' ' in message.text:
         return message.text.split(None, 1)[1]
-    except IndexError:
-        return None
-
+    if message.reply_to_message and message.reply_to_message.text:
+        return message.reply_to_message.text
+    return None
 
 @app.on_message(filters.command("start") & filters.private)
 async def start_command(_, m: t.Message):
@@ -121,7 +122,7 @@ async def chatbots(_, m: t.Message):
     if prompt is None:
         return await m.reply_text(f"✅ Model set to `{model}`. Now send a message without a command.")
 
-    await m.chat.send_chat_action("typing")
+    await _.send_chat_action(m.chat.id, "typing")
     try:
         output = await ChatCompletion(prompt, model)
 
@@ -142,7 +143,7 @@ async def chatbots(_, m: t.Message):
 async def smart_chat(_, m: t.Message):
     prompt = m.text
     model = user_model_memory.get(m.from_user.id, "gpt")
-    await m.chat.send_chat_action("typing")
+    await _.send_chat_action(m.chat.id, "typing")
     try:
         output = await ChatCompletion(prompt, model)
         await m.reply_text(output)
@@ -157,7 +158,7 @@ async def askAboutImage(_, m: t.Message, mediaFiles: list, prompt: str):
         images.append(file_path)
 
     prompt = prompt or "What's this?"
-    await m.chat.send_chat_action("typing")
+    await _.send_chat_action(m.chat.id, "typing")
     try:
         output = await geminiVision(prompt, "geminiVision", images)
         await m.reply_text(f"🖼️ {prompt}\n\n{output}")

@@ -1,95 +1,170 @@
-import os
+import asyncio
 import base64
 import mimetypes
-from pyrogram import Client, filters
-from pyrogram.types import Message, InputMediaPhoto
-from lexica import AsyncClient
-from lexica.constants import languageModels
+import os
+import logging
 from typing import Union, Tuple
 
-# ========== BOT TOKEN ==========
-API_ID = int(os.environ.get("API_ID", "123456"))  # replace 123456 with your id if env not set
-API_HASH = os.environ.get("API_HASH", "your_api_hash_here")
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "your_bot_token_here")
+from pyrogram import Client, filters, types as t
+from dotenv import load_dotenv
+from lexica import AsyncClient
+from lexica.constants import languageModels
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Ensure downloads folder exists
-os.makedirs("./downloads", exist_ok=True)
+# ========== LOAD ENV VARS ==========
+load_dotenv()
 
-# ========== START CLIENT ==========
+def get_env_var(name):
+    value = os.environ.get(name)
+    if not value:
+        raise ValueError(f"Missing required environment variable: {name}")
+    return value
+
+API_ID = int(get_env_var("API_ID"))
+API_HASH = get_env_var("API_HASH")
+BOT_TOKEN = get_env_var("BOT_TOKEN")
+
+# ========== INIT CLIENT ==========
 app = Client("AIChatBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# 🧠 Chat Completion for Text
+# ========== LOGGING ==========
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ========== IN-MEMORY MODEL SELECTION ==========
+user_model_memory = {}
+
+# ========== CHAT COMPLETION ==========
 async def ChatCompletion(prompt, model) -> Union[Tuple[str, list], str]:
     try:
         modelInfo = getattr(languageModels, model)
         client = AsyncClient()
         output = await client.ChatCompletion(prompt, modelInfo)
-        if model == "bard":
-            return output['content'], output['images']
-        return output['content']
-    except Exception as E:
-        return f"API error: {E}"
 
-# 🧠 Image + Prompt -> Gemini Vision
-async def geminiVision(prompt, model, images) -> Union[str, None]:
+        if model == "bard":
+            return output['content'], output.get('images', [])
+        elif model == "gemini":
+            return output['content']['parts'][0]['text']
+        else:
+            return output['content']
+    except Exception as E:
+        raise Exception(f"API error: {E}")
+
+# ========== GEMINI VISION ==========
+async def geminiVision(prompt, model, images) -> str:
     imageInfo = []
     for image in images:
-        with open(image, "rb") as imageFile:
-            data = base64.b64encode(imageFile.read()).decode("utf-8")
+        with open(image, "rb") as f:
+            data = base64.b64encode(f.read()).decode("utf-8")
             mime_type, _ = mimetypes.guess_type(image)
-            imageInfo.append({
-                "data": data,
-                "mime_type": mime_type
-            })
-        os.remove(image)
-    payload = { "images": imageInfo }
+            imageInfo.append({"data": data, "mime_type": mime_type})
+        try:
+            os.remove(image)
+        except OSError:
+            pass
+
+    payload = {"images": imageInfo}
     modelInfo = getattr(languageModels, model)
     client = AsyncClient()
     output = await client.ChatCompletion(prompt, modelInfo, json=payload)
     return output['content']['parts'][0]['text']
 
-# 📸 Get media (photo or image document)
-def getMedia(message: Message):
-    if message.photo:
-        return message.photo
-    if message.document and message.document.mime_type in ['image/png', 'image/jpg', 'image/jpeg'] and message.document.file_size < 5 * 1024 * 1024:
-        return message.document
+# ========== MEDIA EXTRACTOR ==========
+def getMedia(message):
+    target = message if message.media else message.reply_to_message
+    if not target:
+        return None
+    if target.photo:
+        return target.photo
+    if target.document and target.document.mime_type in ['image/png', 'image/jpg', 'image/jpeg'] and target.document.file_size < 5 * 1024 * 1024:
+        return target.document
     return None
 
-# 🚀 Main handler: works in both groups & DMs
-@app.on_message(filters.text & ~filters.edited)
-async def ai_chat(_, m: Message):
-    text = m.text
+# ========== TEXT EXTRACTOR ==========
+def getText(message):
+    if not message.text:
+        return None
+    try:
+        return message.text.split(None, 1)[1]
+    except IndexError:
+        return None
+
+
+@app.on_message(filters.command("start") & filters.private)
+async def start_command(_, m: t.Message):
+    keyboard = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("👤 Owner", url=f"https://t.me/Ur_Haiwan")],
+            [InlineKeyboardButton("Add Me Your Group", url=f"http://t.me/ChatEsproBot?startgroup=true")]
+        ]
+    )
+
+    await m.reply_text(
+        f"👋 Hello {m.from_user.mention}!\n\n"
+        "Welcome to the AI chatbot. Use commands like /gpt, /bard, /gemini to chat.\n\n"
+        "For help or updates, contact the owner or join the channel below.",
+        reply_markup=keyboard
+    )
+
+# ========== COMMAND HANDLER ==========
+@app.on_message(filters.command(["gpt", "bard", "llama", "mistral", "palm", "gemini"]))
+async def chatbots(_, m: t.Message):
+    prompt = getText(m)
     media = getMedia(m)
-    model = "gemini"  # Change to "gpt", "bard", etc. if you prefer
 
-    # 🖼️ If image present
+    model = m.command[0].lower()
+    user_model_memory[m.from_user.id] = model
+
     if media:
-        file_path = await m.download(file_name=f"./downloads/{m.from_user.id}_img.jpg")
-        reply = await geminiVision(text or "What's in this image?", "geminiVision", [file_path])
-        await m.reply_text(reply)
-        return
+        return await askAboutImage(_, m, [media], prompt)
 
-    # 🧠 If only text
-    if not text:
-        return
+    if prompt is None:
+        return await m.reply_text(f"✅ Model set to `{model}`. Now send a message without a command.")
 
-    output = await ChatCompletion(text, model)
+    await m.chat.send_chat_action("typing")
+    try:
+        output = await ChatCompletion(prompt, model)
 
-    # Handle Gemini or Bard output formatting
-    if model == "gemini" and isinstance(output, dict):
-        await m.reply_text(output['parts'][0]['text'])
-    elif model == "bard" and isinstance(output, tuple):
-        text_out, images = output
-        if not images:
-            await m.reply_text(text_out)
-            return
-        media_group = [InputMediaPhoto(i) for i in images]
-        media_group[0] = InputMediaPhoto(images[0], caption=text_out)
-        await _.send_media_group(m.chat.id, media_group, reply_to_message_id=m.id)
-    else:
+        if model == "bard":
+            text, images = output
+            if not images:
+                return await m.reply_text(text)
+            media_group = [t.InputMediaPhoto(img) for img in images]
+            media_group[0] = t.InputMediaPhoto(images[0], caption=text)
+            return await _.send_media_group(m.chat.id, media_group, reply_to_message_id=m.id)
+
         await m.reply_text(output)
+    except Exception as e:
+        await m.reply_text(f"❌ Error: {e}")
 
+# ========== AUTO-REPLY (NO COMMAND) ==========
+@app.on_message(filters.private & filters.text & ~filters.command(["gpt", "bard", "llama", "mistral", "palm", "gemini"]))
+async def smart_chat(_, m: t.Message):
+    prompt = m.text
+    model = user_model_memory.get(m.from_user.id, "gpt")
+    await m.chat.send_chat_action("typing")
+    try:
+        output = await ChatCompletion(prompt, model)
+        await m.reply_text(output)
+    except Exception as e:
+        await m.reply_text(f"❌ Error: {e}")
+
+# ========== GEMINI IMAGE HANDLER ==========
+async def askAboutImage(_, m: t.Message, mediaFiles: list, prompt: str):
+    images = []
+    for media in mediaFiles:
+        file_path = await _.download_media(media.file_id, file_name=f'./downloads/{m.from_user.id}_ask.jpg')
+        images.append(file_path)
+
+    prompt = prompt or "What's this?"
+    await m.chat.send_chat_action("typing")
+    try:
+        output = await geminiVision(prompt, "geminiVision", images)
+        await m.reply_text(f"🖼️ {prompt}\n\n{output}")
+    except Exception as e:
+        await m.reply_text(f"❌ Error: {e}")
+
+# ========== RUN ==========
 if __name__ == "__main__":
-    print("Bot is starting...")
+    print("🤖 Bot is starting...")
     app.run()

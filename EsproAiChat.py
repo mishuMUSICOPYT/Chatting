@@ -6,6 +6,7 @@ from typing import Union, Tuple
 
 from pyrogram import Client, filters, types as t
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+from pyrogram.idle import idle
 
 from lexica import AsyncClient
 from lexica.constants import languageModels
@@ -21,6 +22,7 @@ def get_env_var(name: str) -> str:
 API_ID = int(get_env_var("API_ID"))
 API_HASH = get_env_var("API_HASH")
 BOT_TOKEN = get_env_var("BOT_TOKEN")
+LOG_GROUP_ID = int(get_env_var("LOG_GROUP_ID"))
 
 app = Client("AIChatBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -89,6 +91,15 @@ async def start_command(_, m: t.Message):
         reply_markup=keyboard
     )
 
+    # Log message to log group
+    try:
+        await _.send_message(
+            LOG_GROUP_ID,
+            f"👤 [{m.from_user.first_name}](tg://user?id={m.from_user.id}) ne /start command use kiya."
+        )
+    except Exception as e:
+        print(f"Log send error: {e}")
+
 # ========== /PING ==========
 @app.on_message(filters.command("ping") & filters.private)
 async def ping(_, message):
@@ -148,7 +159,20 @@ async def askAboutImage(_, m: t.Message, mediaFiles: list, prompt: str):
     output = await geminiVision(prompt or "What's this?", "gemini", images)
     await m.reply_text(output)
 
-if __name__ == "__main__":
-    print("Bot is starting...")
-    app.run()
+# ========== MAIN ==========
+async def main():
+    await app.start()
+    print("Bot started.")
+
+    # Send startup log to log group
+    try:
+        await app.send_message(LOG_GROUP_ID, "✅ Bot start ho gaya hai.")
+    except Exception as e:
+        print(f"Startup log error: {e}")
+
+    await idle()
+    await app.stop()
     print("Bot stopped.")
+
+if __name__ == "__main__":
+    asyncio.run(main())

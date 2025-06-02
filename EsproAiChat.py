@@ -21,6 +21,7 @@ def get_env_var(name: str) -> str:
 API_ID = int(get_env_var("API_ID"))
 API_HASH = get_env_var("API_HASH")
 BOT_TOKEN = get_env_var("BOT_TOKEN")
+START_PHOTO = get_env_var("START_PHOTO")
 
 app = Client("AIChatBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -78,14 +79,18 @@ def getText(message):
 async def start_command(_, m: t.Message):
     keyboard = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("👤 Owner", url="https://t.me/Ur_Haiwan")],
-            [InlineKeyboardButton("➕ Add Me To Group", url="http://t.me/ChatEsproBot?startgroup=true")]
+            [InlineKeyboardButton("👤 Owner", url="https://t.me/ll_ksd_ll")],
+            [InlineKeyboardButton("➕ Add Me To Group", url="https://t.me/PowerStudyChatgptBot?startgroup=s&admin=delete_messages+manage_video_chats+pin_messages+invite_users")]
         ]
     )
-    await m.reply_text(
-        f"👋 Hello {m.from_user.mention}!\n\n"
-        "Welcome to the AI chatbot. Use commands like /gpt, /bard, /gemini to chat.\n\n"
-        "For help or updates, contact the owner.",
+    await m.reply_photo(
+        photo=START_PHOTO,
+        caption=(
+            f"👋 Hello {m.from_user.mention}!\n\n"
+            "Welcome to the AI chatbot.\n"
+            "Use commands like /gpt, /bard, /gemini to chat with advanced AI models.\n\n"
+            "ℹ️ For help or updates, contact the owner or add me to a group using the button below."
+        ),
         reply_markup=keyboard
     )
 

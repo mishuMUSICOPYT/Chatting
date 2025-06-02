@@ -10,14 +10,13 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMedi
 from lexica import AsyncClient
 from lexica.constants import languageModels
 
-# ========== ENV VAR HELP ==========
+# ========== ENV VAR ==========
 def get_env_var(name: str) -> str:
     value = os.getenv(name)
     if not value:
         raise EnvironmentError(f"Missing environment variable: {name}")
     return value
 
-# ========== CONFIG ==========
 API_ID = int(get_env_var("API_ID"))
 API_HASH = get_env_var("API_HASH")
 BOT_TOKEN = get_env_var("BOT_TOKEN")
@@ -31,7 +30,9 @@ user_model_memory = {}
 # ========== CHAT COMPLETION ==========
 async def ChatCompletion(prompt, model) -> Union[Tuple[str, list], str]:
     try:
-        modelInfo = getattr(languageModels, model)
+        modelInfo = getattr(languageModels, model, None)
+        if not modelInfo:
+            raise ValueError(f"Unknown model: {model}")
         client = AsyncClient()
         output = await client.ChatCompletion(prompt, modelInfo)
         if model == "bard":
@@ -51,7 +52,10 @@ async def geminiVision(prompt, model, images) -> str:
                 "data": data,
                 "mime_type": mime_type
             })
-        os.remove(image)
+        try:
+            os.remove(image)
+        except Exception:
+            pass
     modelInfo = getattr(languageModels, model)
     client = AsyncClient()
     output = await client.ChatCompletion(prompt, modelInfo, json={"images": imageInfo})
@@ -80,7 +84,7 @@ async def start_command(_, m: t.Message):
     keyboard = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("👤 Owner", url="https://t.me/ll_ksd_ll")],
-            [InlineKeyboardButton("➕ Add Me To Group", url="https://t.me/PowerStudyChatgptBot?startgroup=s&admin=delete_messages+manage_video_chats+pin_messages+invite_users")]
+            [InlineKeyboardButton("➕ Add Me To Group", url="https://t.me/PowerStudyChatgptBot?startgroup=true&admin=delete_messages+manage_video_chats+pin_messages")]
         ]
     )
     await m.reply_photo(
@@ -95,13 +99,16 @@ async def start_command(_, m: t.Message):
     )
 
 # ========== /PING ==========
-@app.on_message(filters.command("ping") & filters.private)
+@app.on_message(filters.command("ping") & (filters.private | filters.group))
 async def ping(_, message):
     await message.reply_text("Pong! Bot is running ✅")
 
-# ========== /GPT /BARD /GEMINI /ETC ==========
-@app.on_message(filters.command(["gpt", "bard", "llama", "mistral", "palm", "gemini"]))
+# ========== /GPT /BARD /GEMINI ==========
+@app.on_message(filters.command(["gpt", "bard", "llama", "mistral", "palm", "gemini"]) & (filters.private | filters.group))
 async def chatbots(_, m: t.Message):
+    if not m.from_user:
+        return  # Ignore anonymous admin or channels
+
     prompt = getText(m)
     media = getMedia(m)
 
@@ -112,7 +119,7 @@ async def chatbots(_, m: t.Message):
         return await askAboutImage(_, m, [media], prompt)
 
     if not prompt:
-        return await m.reply_text(f"✅ Model set to `{model}`. Ab bina command ke message bhejo.")
+        return await m.reply_text(f"✅ Model set to `{model}`. Now send a message without command.")
 
     try:
         output = await ChatCompletion(prompt, model)
@@ -129,11 +136,20 @@ async def chatbots(_, m: t.Message):
         await m.reply_text(text)
 
     except Exception as e:
-        await m.reply_text(f"❌ Error: {e}")
+        await m.reply_text("❌ Failed to process message.")
+        print(f"Error: {e}")
 
 # ========== TEXT AUTO-REPLY ==========
-@app.on_message(filters.private & filters.text & ~filters.command(["gpt", "bard", "llama", "mistral", "palm", "gemini"]))
+@app.on_message(filters.text & ~filters.command(["gpt", "bard", "llama", "mistral", "palm", "gemini"]))
 async def smart_chat(_, m: t.Message):
+    if not m.from_user:
+        return  # Ignore anonymous admin or channels
+
+    # Optional: allow only in certain groups
+    allowed_chats = ["private", -1001234567890]  # Replace group ID if needed
+    if m.chat.type != "private" and m.chat.id not in allowed_chats:
+        return
+
     prompt = m.text
     model = user_model_memory.get(m.from_user.id, "gpt")
 
@@ -142,10 +158,12 @@ async def smart_chat(_, m: t.Message):
         text = output['parts'][0]['text'] if model == "gemini" else output
         await m.reply_text(text)
     except Exception as e:
-        await m.reply_text(f"❌ Error: {e}")
+        await m.reply_text("❌ Error. Try again later.")
+        print(f"Error: {e}")
 
 # ========== IMAGE + PROMPT HANDLER ==========
 async def askAboutImage(_, m: t.Message, mediaFiles: list, prompt: str):
+    os.makedirs("./downloads", exist_ok=True)
     images = []
     for media in mediaFiles:
         image = await _.download_media(media.file_id, file_name=f"./downloads/{m.from_user.id}_ask.jpg")
@@ -153,6 +171,7 @@ async def askAboutImage(_, m: t.Message, mediaFiles: list, prompt: str):
     output = await geminiVision(prompt or "What's this?", "gemini", images)
     await m.reply_text(output)
 
+# ========== BOT START ==========
 if __name__ == "__main__":
     print("Bot is starting...")
     app.run()

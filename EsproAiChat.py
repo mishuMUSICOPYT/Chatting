@@ -6,19 +6,17 @@ from typing import Union, Tuple
 
 from pyrogram import Client, filters, types as t
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
-from pyrogram.idle import idle
 
 from lexica import AsyncClient
 from lexica.constants import languageModels
 
-# ========== ENV VAR HELP ==========
+# ========== ENV VAR ==========
 def get_env_var(name: str) -> str:
     value = os.getenv(name)
     if not value:
         raise EnvironmentError(f"Missing environment variable: {name}")
     return value
 
-# ========== CONFIG ==========
 API_ID = int(get_env_var("API_ID"))
 API_HASH = get_env_var("API_HASH")
 BOT_TOKEN = get_env_var("BOT_TOKEN")
@@ -26,10 +24,10 @@ LOG_GROUP_ID = int(get_env_var("LOG_GROUP_ID"))
 
 app = Client("AIChatBot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# ========== USER MEMORY ==========
+# ========== MEMORY ==========
 user_model_memory = {}
 
-# ========== CHAT COMPLETION ==========
+# ========== AI CHAT ==========
 async def ChatCompletion(prompt, model) -> Union[Tuple[str, list], str]:
     try:
         modelInfo = getattr(languageModels, model)
@@ -48,17 +46,14 @@ async def geminiVision(prompt, model, images) -> str:
         with open(image, "rb") as imageFile:
             data = base64.b64encode(imageFile.read()).decode("utf-8")
             mime_type, _ = mimetypes.guess_type(image)
-            imageInfo.append({
-                "data": data,
-                "mime_type": mime_type
-            })
+            imageInfo.append({"data": data, "mime_type": mime_type})
         os.remove(image)
     modelInfo = getattr(languageModels, model)
     client = AsyncClient()
     output = await client.ChatCompletion(prompt, modelInfo, json={"images": imageInfo})
     return output['content']['parts'][0]['text']
 
-# ========== GET MEDIA ==========
+# ========== UTILS ==========
 def getMedia(message):
     media = message.media or (message.reply_to_message.media if message.reply_to_message else None)
     if media:
@@ -69,7 +64,6 @@ def getMedia(message):
             return target.document
     return None
 
-# ========== GET TEXT ==========
 def getText(message):
     if not message.text:
         return None
@@ -91,7 +85,7 @@ async def start_command(_, m: t.Message):
         reply_markup=keyboard
     )
 
-    # Log message to log group
+    # Log user start to group
     try:
         await _.send_message(
             LOG_GROUP_ID,
@@ -105,7 +99,7 @@ async def start_command(_, m: t.Message):
 async def ping(_, message):
     await message.reply_text("Pong! Bot is running ✅")
 
-# ========== /GPT /BARD /GEMINI /ETC ==========
+# ========== /GPT /BARD /GEMINI ==========
 @app.on_message(filters.command(["gpt", "bard", "llama", "mistral", "palm", "gemini"]))
 async def chatbots(_, m: t.Message):
     prompt = getText(m)
@@ -162,17 +156,17 @@ async def askAboutImage(_, m: t.Message, mediaFiles: list, prompt: str):
 # ========== MAIN ==========
 async def main():
     await app.start()
-    print("Bot started.")
+    print("✅ Bot started.")
 
-    # Send startup log to log group
     try:
         await app.send_message(LOG_GROUP_ID, "✅ Bot start ho gaya hai.")
     except Exception as e:
         print(f"Startup log error: {e}")
 
-    await idle()
+    await asyncio.Event().wait()
+
     await app.stop()
-    print("Bot stopped.")
+    print("❌ Bot stopped.")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -148,7 +148,7 @@ async def smart_chat(_, m: t.Message):
         return  # Ignore anonymous admin or channels
 
     # Optional: allow only in certain groups
-    allowed_chats = ["private", -1001234567890]  # Replace group ID if needed
+    allowed_chats = ["private", -1002260119965]  # Replace group ID if needed
     if m.chat.type != "private" and m.chat.id not in allowed_chats:
         return
 

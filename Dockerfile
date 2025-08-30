@@ -1,7 +1,12 @@
 FROM python:latest
-RUN apt-get update && apt-get upgrade -y
+
+RUN apt-get update -y && apt-get upgrade -y
+
 RUN pip3 install -U pip
+
 COPY . /app/
 WORKDIR /app/
-RUN pip3 install -U -r Installer
-CMD python3 EsproAiChat.py
+RUN pip3 install --upgrade pip
+RUN pip3 install -U -r requirements.txt
+
+CMD bash start
